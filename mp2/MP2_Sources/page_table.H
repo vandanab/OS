@@ -47,9 +47,9 @@ private:
   static FramePool     * process_mem_pool;   /* Frame pool for the process memory */
   static unsigned long   shared_size;        /* size of shared address space */
 	
-	static void create_page_table_entry(unsigned long *paging_entity_address,
+	static void create_page_table_entry(unsigned long *requested_frame_from_framepool,
+																			unsigned long *paging_entity_address,
 																			unsigned long index,
-																			unsigned long fault_address,
 																			unsigned long control_bits);
 	/* creates a page table entry given the control bits */
 

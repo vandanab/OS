@@ -27,6 +27,7 @@
 /*--------------------------------------------------------------------------*/
 #include "page_table.H"
 #include "paging_low.H"
+#include "console.H"
 
 /*--------------------------------------------------------------------------*/
 /* FORWARDS */
@@ -58,7 +59,8 @@ unsigned long PageTable::shared_size; /* size of shared address space */
 	has been enabled.
 */
 PageTable::PageTable() {
-	this->page_directory = (unsigned long *)(kernel_mem_pool->get_frame() * Machine::PAGE_SIZE);
+	this->page_directory = (unsigned long *)(kernel_mem_pool->get_frame() * PAGE_SIZE);
+	
 	unsigned long *page_table = (unsigned long *)(kernel_mem_pool->get_frame() * PAGE_SIZE); //shifting by 12 bits by multiplying by PAGE_SIZE
 	
 	//map the first 4MB of memory
@@ -74,7 +76,7 @@ PageTable::PageTable() {
 
 	//fill the remaining ENTRIES_PER_PAGE - 1 entries as not-present
 	for(unsigned int i = 1; i < ENTRIES_PER_PAGE; i++) {
-		this->page_directory[0] = 0 | 2;
+		this->page_directory[i] = 0 | 2;
 	}
 }
 
@@ -113,22 +115,58 @@ void PageTable::handle_fault(REGS * _r) {
 			unsigned long page_directory_index = fault_address >> 22; //constify this
 			unsigned long page_table_index = (fault_address & 0x003FFFFF) >> 12; //constify this
 			unsigned long *page_directory = current_page_table->get_page_directory();
-			if(page_directory[page_directory_index] && 1) { //constify this
+			
+			if(page_directory[page_directory_index] & 1) { //constify this
 				//page table entry is present in the directory
-				unsigned long *page_table = (unsigned long *)page_directory[page_directory_index];
-				if(page_table[page_table_index] && 1) {
+				unsigned long *page_table = (unsigned long *)(page_directory[page_directory_index] & (0xFFFFF000));
+				if(page_table[page_table_index] & 1) {
 					//page entry is present in the page table
 					//why did the page fault occur? :P
 				}
 				else {
+
 					//constify the 3 - PT entry control bits
-					create_page_table_entry(page_table, page_table_index, fault_address, 3);
+					unsigned long *requested_page_from_framepool;
+					if(fault_address >= shared_size) {
+						requested_page_from_framepool =
+							(unsigned long *)(process_mem_pool->get_frame() * PAGE_SIZE);
+					} else {
+						requested_page_from_framepool =
+							(unsigned long *)(kernel_mem_pool->get_frame() * PAGE_SIZE);
+					}
+					
+					create_page_table_entry(requested_page_from_framepool,
+																	page_table,
+																	page_table_index,
+																	3);
+
 					//handle the fault by reading/writing to that location or do what is required
+
 				}
 			} else {
-				create_page_table_entry(page_directory, page_directory_index, fault_address, 3);
-				unsigned long *page_table = (unsigned long *)page_directory[page_directory_index];
-				create_page_table_entry(page_table, page_table_index, fault_address, 3);
+				//create page table
+				unsigned long *requested_page_from_framepool =
+									(unsigned long *)(kernel_mem_pool->get_frame() * PAGE_SIZE);
+
+				create_page_table_entry(requested_page_from_framepool,
+																page_directory,
+																page_directory_index,
+																3);
+
+				unsigned long *page_table = (unsigned long *)(page_directory[page_directory_index] & (0xFFFFF000));
+				
+				if(fault_address >= shared_size) {
+					requested_page_from_framepool =
+							(unsigned long *)(process_mem_pool->get_frame() * PAGE_SIZE);
+				} else {
+					requested_page_from_framepool =
+							(unsigned long *)(kernel_mem_pool->get_frame() * PAGE_SIZE);
+				}
+
+				create_page_table_entry(requested_page_from_framepool,
+																page_table,
+																page_table_index,
+																3);
 				//handle the fault by reading/writing to that location or do what is required
 			}
 			break;
@@ -156,19 +194,11 @@ void PageTable::handle_fault(REGS * _r) {
 
 
 //private static
-void PageTable::create_page_table_entry(unsigned long *paging_entity_address,
+void PageTable::create_page_table_entry(unsigned long *requested_frame_from_framepool,
+																				unsigned long *paging_entity_address,
 																				unsigned long index,
-																				unsigned long fault_address,
-																				unsigned long control_bits) {
-	unsigned long *requested_page_from_framepool;
-	if(fault_address >= shared_size) {
-		requested_page_from_framepool =
-									(unsigned long *)(process_mem_pool->get_frame() * PAGE_SIZE);
-	} else {
-		requested_page_from_framepool =
-									(unsigned long *)(kernel_mem_pool->get_frame() * PAGE_SIZE);
-	}
-	paging_entity_address[index] = (unsigned long)requested_page_from_framepool | control_bits;
+																				unsigned long control_bits) {	
+	paging_entity_address[index] = (unsigned long)requested_frame_from_framepool | control_bits;
 }
 
 

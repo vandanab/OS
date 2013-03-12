@@ -58,23 +58,45 @@ unsigned int FramePool::num_framepools;
 FramePool::FramePool(unsigned long _base_frame_no,
 					unsigned long _nframes,
 					unsigned long _info_frame_no) {
-	if(_info_frame_no == 0) {
-		_info_frame_no += _base_frame_no;
-		FramePool::num_framepools = 0;
-	}
-	this->_base_frame_no = (unsigned long *)(_base_frame_no * Machine::PAGE_SIZE); //shifting by 12 bits by multiplying by PAGE_SIZE
+	
+	if(_info_frame_no == 0)
+		_info_frame_no = _base_frame_no;
+
+	this->_base_frame_no = (unsigned long *)(_info_frame_no * Machine::PAGE_SIZE); //shifting by 12 bits by multiplying by PAGE_SIZE
 	*(this->_base_frame_no) = _base_frame_no;
+
 	this->_nframes = (unsigned long *)(this->_base_frame_no + 1);
 	*(this->_nframes) = _nframes;
+
 	this->_info_frame_no = (unsigned long *)(this->_nframes + 1);
 	*(this->_info_frame_no) = _info_frame_no;
+
 	this->bitmap = (unsigned long *)(this->_info_frame_no + 1);
+	
 	//init bitmap - all zeros
 	for(unsigned long i = 0; i < _nframes; i++) {
+		/*
+		if(i % 32 == 0) {
+			Console::putui((unsigned int)i); Console::puts(":");
+			Console::putui((unsigned int)this->bitmap[(i/32)-1]); Console::puts("\n");
+		}*/
 		this->unset_bit(i);
 	}
-	//set the bit for frame information frame
-	this->set_bit(_info_frame_no - _base_frame_no);
+	/*	
+	if(_nframes > 7000) {
+		this->set_bit(7167);
+		Console::putui((unsigned int)this->bitmap[223]); Console::puts("\n");
+	}*/
+	
+	//if kernel frame pool set the info frame bit.
+	//process frame pool's bit is set by the kernel
+	//TODO: have a better way to assign info frame for kernel pool, ask harsha.
+	if(_info_frame_no == _base_frame_no) {
+		//set the bit for frame information frame
+		this->set_bit((*this->_info_frame_no) - (*this->_base_frame_no));
+		FramePool::num_framepools = 0;
+	}
+	//Console::putui((unsigned int)this->bitmap[0]); Console::puts("\n");
 	
 	framepool_list[num_framepools] = this;
 	num_framepools++;
@@ -88,9 +110,11 @@ unsigned long FramePool::get_frame() {
 		if(this->is_set(i))
 			continue;
 		this->set_bit(i);
-		frame_no = *this->_base_frame_no + i;
+		frame_no = (*this->_base_frame_no) + i;
 		break;
 	}
+	//Console::putui((unsigned int)this->bitmap[0]); Console::puts("\n");
+	//Console::putui((unsigned int)frame_no); Console::puts("\n");
 	return frame_no;
 }
 
@@ -99,9 +123,9 @@ unsigned long FramePool::get_frame() {
 	* same semanticas as in the constructor.
 	*/
 void FramePool::mark_inaccessible(unsigned long _base_frame_no, unsigned long _nframes) {
-	unsigned long bit_index = _base_frame_no - *this->_base_frame_no;
-	for(bit_index; bit_index < bit_index + _nframes; bit_index++) {
-		this->set_bit(bit_index);
+	unsigned long bit_no = _base_frame_no - *this->_base_frame_no;
+	for(unsigned long i = 0; i < _nframes; i++) {
+		this->set_bit(i+bit_no);
 	}
 }
 
