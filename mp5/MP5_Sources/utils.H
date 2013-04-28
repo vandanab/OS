@@ -57,7 +57,7 @@ unsigned short *memsetw(unsigned short *dest, unsigned short val, int count);
 /* SIMPLE STRING OPERATIONS (STRINGS ARE NULL-TERMINATED) */
 /*---------------------------------------------------------------*/
 
-//int strlen(const char * _str);
+int strlen(const char * _str);
 /* Determine the length of null-terminated string. */
 
 void strcpy(char * _dst, char * _src);

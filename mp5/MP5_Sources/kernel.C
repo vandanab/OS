@@ -20,7 +20,7 @@
 
 /* -- COMMENT/UNCOMMENT THE FOLLOWING LINE TO EXCLUDE/INCLUDE SCHEDULER CODE */
 
-#define _USES_SCHEDULER_
+//#define _USES_SCHEDULER_
 /* This macro is defined when we want to force the code below to use 
    a scheduler.
    Otherwise, no scheduler is used, and the threads pass control to each 
@@ -33,7 +33,7 @@
    Leave the macro undefined if you don't want to exercise the disk code.
 */
 
-//#define _USES_FILESYSTEM_
+#define _USES_FILESYSTEM_
 /* This macro is defined when we want to exercise file-system code.
    If defined, the system defines a file system, and Thread 3 issues 
    issues operations to it.
@@ -64,8 +64,7 @@
 #endif
 
 #ifdef _USES_DISK_
-//#include "simple_disk.H"
-#include "blocking_disk.H"
+#include "simple_disk.H"
 #endif
 
 #ifdef _USES_FILESYSTEM_
@@ -100,8 +99,7 @@ Scheduler * SYSTEM_SCHEDULER;
 #ifdef _USES_DISK_
 
 /* -- A POINTER TO THE SYSTEM DISK */
-//SimpleDisk * SYSTEM_DISK;
-BlockingDisk * SYSTEM_DISK;
+SimpleDisk * SYSTEM_DISK;
 
 #define SYSTEM_DISK_SIZE 10485760
 
@@ -154,14 +152,40 @@ int rand() {
   unsigned long dummy_sec;
   int           dummy_tic;
 
-  SimpleTimer::current(dummy_sec, dummy_tic);
+  //SimpleTimer::current(dummy_sec, dummy_tic);
 
   return dummy_tic;
 }
 
 void exercise_file_system(FileSystem * _file_system, SimpleDisk * _simple_disk) {
-  /* NOTHING FOR NOW. 
+  /* NOTHING FOR NOW 
      FEEL FREE TO ADD YOUR OWN CODE. */
+	FileSystem::Format(_simple_disk, _simple_disk->size());
+	_file_system->Mount(_simple_disk);
+	BOOLEAN success = _file_system->CreateFile(0);
+	if(success) {
+		Console::puts("File created...\n");
+	} else {
+		Console::puts("Error creating file... Big Trouble\n");
+	}
+	File f;
+	_file_system->LookupFile(0, &f);
+	char buf[1];
+	unsigned int n = f.Read(1, buf);
+	if(n > 0)
+		Console::puts("Problem - able to read...\n");
+	buf[0] = 'a';
+	f.Write(1, buf);
+	f.Reset();
+	char rbuf[1];
+	n = f.Read(1, rbuf);
+	if(n != 1)
+		Console::puts("Problem - not able to read...\n");
+	Console::puts("File Contents: ");
+	Console::puts(rbuf);
+	Console::puts("\n");
+	if(!_file_system->DeleteFile(0))
+		Console::puts("Not able to delete file\n");
 }
 
 #endif
@@ -180,11 +204,12 @@ void fun1() {
 
     Console::puts("FUN 1 INVOKED!\n");
 
-    for(int j = 0;; j++) {
+    for(int j = 0;j < 1; j++) {
 
        Console::puts("FUN 1 IN ITERATION["); Console::puti(j); Console::puts("]\n");
 
-       for (int i = 0; i < 10; i++) {
+       //for (int i = 0; i < 10; i++) {
+       for (int i = 0; i < 0; i++) {
 	  Console::puts("FUN 1: TICK ["); Console::puti(i); Console::puts("]\n");
        }
 
@@ -205,7 +230,7 @@ void fun2() {
     int  write_block = 0;
 #endif
 
-    for(int j = 0;; j++) {
+    for(int j = 0;j < 1; j++) {
 
        Console::puts("FUN 2 IN ITERATION["); Console::puti(j); Console::puts("]\n");
 
@@ -236,8 +261,9 @@ void fun2() {
        read_block  = (read_block + 1) % 10;
 #else
 
-       for (int i = 0; i < 10; i++) {
-	  Console::puts("FUN 2: TICK ["); Console::puti(i); Console::puts("]\n");
+       //for (int i = 0; i < 10; i++) {
+       for (int i = 0; i < 0; i++) {
+				 Console::puts("FUN 2: TICK ["); Console::puti(i); Console::puts("]\n");
        }
      
 #endif
@@ -254,21 +280,21 @@ void fun3() {
 
 #ifdef _USES_FILESYSTEM_
 
-    exercise_file_system(FILE_SYSTEM);
+    exercise_file_system(FILE_SYSTEM, SYSTEM_DISK);
 
 #else
-
-     for(int j = 0;; j++) {
-
-       Console::puts("FUN 3 IN BURST["); Console::puti(j); Console::puts("]\n");
+    
+		for(int j = 0; j < 0; j++) {
+			
+			Console::puts("FUN 3 IN BURST["); Console::puti(j); Console::puts("]\n");
 
        for (int i = 0; i < 10; i++) {
-	  Console::puts("FUN 3: TICK ["); Console::puti(i); Console::puts("]\n");
+				 Console::puts("FUN 3: TICK ["); Console::puti(i); Console::puts("]\n");
        }
     
-#endif
        pass_on_CPU(thread4);
     }
+#endif
 }
 
 void fun4() {
@@ -379,10 +405,8 @@ int main() {
 
     /* -- DISK DEVICE -- IF YOU HAVE ONE -- */
 
-    //SimpleDisk system_disk = SimpleDisk(MASTER, SYSTEM_DISK_SIZE);
-    BlockingDisk system_disk = BlockingDisk(MASTER, SYSTEM_DISK_SIZE, SYSTEM_SCHEDULER);
+    SimpleDisk system_disk = SimpleDisk(MASTER, SYSTEM_DISK_SIZE);
     SYSTEM_DISK = &system_disk;
-		SYSTEM_SCHEDULER->add_blocking_disk(SYSTEM_DISK);
 
 #endif
 

@@ -69,7 +69,6 @@ private:
 		 unsigned long file_size;
 		 unsigned long start_block;
 
-		 void init(unsigned int fid, FileSystem *fs);
 		 BOOLEAN is_current_ptr_in_allocated_block();
 
 public:
@@ -99,7 +98,9 @@ public:
 
     BOOLEAN EoF();
     /* Is the current location for the file at the end of the file? */
-
+		 
+		void init(unsigned int fid, FileSystem *fs);
+		/* Initializes the file system and related attributes */
 
 };
 

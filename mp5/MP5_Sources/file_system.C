@@ -21,7 +21,7 @@
 /*--------------------------------------------------------------------------*/
 
 #include "file_system.H"
-#include "cstring"
+#include "console.H"
 
 /*--------------------------------------------------------------------------*/
 /* DATA STRUCTURES */ 
@@ -56,7 +56,10 @@ void File::init(unsigned int fid, FileSystem *fs) {
 unsigned int File::Read(unsigned int _n, char * _buf) {
 	int buf_index = 0;
 	unsigned long i = this->start_block;
-	int y = this->file_size - this->current_ptr;
+	unsigned int y = this->file_size - this->current_ptr;
+	Console::puts("In Read - num bytes in file: ");
+	Console::putui(y);
+	Console::puts("\n");
 	int num_bytes_remaining_to_read = y > _n ? _n : y;
 	unsigned char *rbuf = new unsigned char[BLOCK_SIZE];
 	while(num_bytes_remaining_to_read > 0) {
@@ -78,7 +81,7 @@ unsigned int File::Read(unsigned int _n, char * _buf) {
 		this->current_ptr += bytes_to_read_in_current_block;
 	}
 	delete rbuf;
-	return (_n - num_bytes_remaining_to_read);
+	return (y > _n ? _n : y);
 }
 
 /* Write _n characters to the file starting at the current 
@@ -86,6 +89,7 @@ unsigned int File::Read(unsigned int _n, char * _buf) {
 	the size of the file as needed. 
 */
 unsigned int File::Write(unsigned int _n, char * _buf) {
+	Console::puts("In Write\n");
 	unsigned long prev_file_size = this->file_size;
 	int num_bytes_remaining = _n;
 	int buf_index = 0;
@@ -95,7 +99,12 @@ unsigned int File::Write(unsigned int _n, char * _buf) {
 	while(num_bytes_remaining > 0) {
 		unsigned long offset_in_block = (this->current_ptr % BLOCK_SIZE);
 		int x = BLOCK_SIZE - offset_in_block;
-		int bytes_to_write_in_current_block = num_bytes_remaining > x ? x : num_bytes_remaining;
+		unsigned int bytes_to_write_in_current_block = num_bytes_remaining > x ? x : num_bytes_remaining;
+
+		Console::puts("In Write - bytes_to_write_in_current_block: ");
+		Console::putui(bytes_to_write_in_current_block);
+		Console::puts("\n");
+
 		if(this->is_current_ptr_in_allocated_block()) {
 			//find current pointer block
 			unsigned long ith_block_in_list = (this->current_ptr/BLOCK_SIZE);
@@ -114,7 +123,14 @@ unsigned int File::Write(unsigned int _n, char * _buf) {
 				break;
 			}
 		}
+		Console::puts("Block to write in: ");
+		Console::putui((unsigned int)i);
+		Console::puts("\n");
+
 		memcpy(rbuf+offset_in_block, _buf+buf_index, bytes_to_write_in_current_block);
+		Console::putch(rbuf[0]);
+		Console::puts("\n");
+
 		this->file_system->disk->write(i, rbuf);
 		buf_index += bytes_to_write_in_current_block;
 		num_bytes_remaining -= bytes_to_write_in_current_block;
@@ -126,7 +142,12 @@ unsigned int File::Write(unsigned int _n, char * _buf) {
 	}
 	delete rbuf;
 	if(this->file_size > prev_file_size) {
+		Console::puts("File size incremented to: ");
+		Console::putui((unsigned int)this->file_size);
+		Console::puts("\n");
+
 		//TODO: write dir to disk
+
 		//TODO: write FAT to disk if get_free_block doesnt write it
 	}
 	return (_n - num_bytes_remaining);
@@ -179,8 +200,12 @@ BOOLEAN File::EoF() {
 FileSystem::FileSystem() {
 	//initializing in-memory dir structure
 	//cannot move to disk until a disk is mounted
+	const int DIR_NODE_SIZE = sizeof(struct dir_node);
 	for(int i = 0; i < MAX_NUM_OF_FILES; i++) {
-		this->dir[i] = NULL;
+		struct dir_node x;
+		x.start_block = 0;
+		x.size = 0;
+		memcpy(&this->dir[i], &x, DIR_NODE_SIZE);
 	}
 }
 
@@ -202,35 +227,27 @@ BOOLEAN FileSystem::Mount(SimpleDisk * _disk) {
 
 	//read dir from disk
 	read_dir_from_disk();
-
+	
 	//read FAT from disk
 	read_FAT_from_disk();
+	Console::puts("In Mount - FAT size: ");
+	Console::putui((unsigned int)this->FAT_size);
+	Console::puts("\n");
+	/*
+	for(unsigned long i = this->alloc_start_block; i < this->alloc_start_block + 1; i++) {
+		Console::putui((unsigned int)this->FAT[i]);
+		Console::putch(' ');
+	}
+	Console::puts("\n");
+	for(;;) {
+	}
+	*/
 
 	return TRUE;
 }
 
-/*
-static void FileSystem::init_dir(unsigned long *dir_) {
-	//initializing in-memory dir structure
-	//cannot move to disk until a disk is mounted
-	for(int i = 0; i < MAX_NUM_OF_FILES; i++) {
-		dir_[i] = 0;
-	}
-}
-
-static void FileSystem::init_FAT(unsigned long *fat, unsigned long *fat_size, unsigned long size_) {
-	//in-memory FAT init
-	*fat_size = size_ / BLOCK_SIZE;
-	fat = new unsigned long[fat_size];
-	fat[0] = 0; //the directory block
-	for(int i = 1; i < *fat_size; i++) {
-		fat[i] = i+1;
-	}
-	fat[fat_size] = 1;
-}
-*/
-
 void FileSystem::read_dir_from_disk() {
+	Console::puts("In read_dir_from_disk\n");
 	const int DIR_NODE_SIZE = sizeof(struct dir_node);
 	unsigned char *buf = new unsigned char[BLOCK_SIZE];
 	this->disk->read(0, buf);
@@ -289,12 +306,12 @@ void FileSystem::write_FAT_to_disk() {
 
 /* Wipes any file system from the given disk and installs a new, empty, file 
 	system that supports up to _size Byte. */
-//static BOOLEAN FileSystem::Format(BlockingDisk * _disk, unsigned int _size) {
+//BOOLEAN FileSystem::Format(BlockingDisk * _disk, unsigned int _size) {
 BOOLEAN FileSystem::Format(SimpleDisk * _disk, unsigned int _size) {
 	FileSystem::clear_ds_blocks(_disk, _size);
 }
 
-//static void FileSystem::clear_ds_blocks(BlockingDisk *_disk, unsigned int _size) {
+//void FileSystem::clear_ds_blocks(BlockingDisk *_disk, unsigned int _size) {
 void FileSystem::clear_ds_blocks(SimpleDisk *_disk, unsigned int _size) {
 	int fat_size = (_size/BLOCK_SIZE);
 	int num_cells_per_block = BLOCK_SIZE/sizeof(unsigned long);
@@ -303,8 +320,8 @@ void FileSystem::clear_ds_blocks(SimpleDisk *_disk, unsigned int _size) {
 	//0th block taken by dir
 
 	unsigned char *buf = new unsigned char[BLOCK_SIZE];
-	for(int j = 0; i < BLOCK_SIZE; i++) {
-		buf[j] = (char)0;
+	for(int i = 0; i < BLOCK_SIZE; i++) {
+		buf[i] = (char)0;
 	}
 	for(int i = 0; i <= num_of_blocks_taken_by_FAT; i++) {
 		_disk->write(i, buf);
@@ -315,7 +332,7 @@ void FileSystem::clear_ds_blocks(SimpleDisk *_disk, unsigned int _size) {
 /* Find file with given id in file system. If found, initialize the file 
 	object and return TRUE. Otherwise, return FALSE. */
 BOOLEAN FileSystem::LookupFile(int _file_id, File * _file) {
-	if(this->dir[_file_id] != NULL) {
+	if(this->dir[_file_id].start_block != 0) {
 		_file->init(_file_id, this);
 		return TRUE;
 	}
@@ -325,7 +342,7 @@ BOOLEAN FileSystem::LookupFile(int _file_id, File * _file) {
 /* Create file with given id in the file system. If file exists already, 
 	abort and return FALSE. Otherwise, return TRUE. */
 BOOLEAN FileSystem::CreateFile(int _file_id) {
-	if(this->dir[_file_id] != NULL)
+	if(this->dir[_file_id].start_block != 0)
 		return FALSE;
 	unsigned long free_block;
 	if(get_free_block(&free_block, 0)) {
@@ -353,6 +370,11 @@ BOOLEAN FileSystem::get_free_block(unsigned long *block, unsigned long parent) {
 			*block = i;
 			//TODO:write FAT to disk
 			//or optimize and write to disk when the file write is complete
+			Console::puts("In get_free_block - free_block: ");
+			Console::putui((unsigned int)i);
+			Console::puts(" ");
+			Console::putui((unsigned int)this->FAT[i]);
+			Console::puts("\n");
 			return TRUE;
 		}
 	}
@@ -367,10 +389,11 @@ BOOLEAN FileSystem::DeleteFile(int _file_id) {
 	do {
 		i = this->FAT[i];
 		this->FAT[i] = 0;
-	} while(i != this->dir[_file_id].start_block)
+	} while(i != this->dir[_file_id].start_block);
 
 	//TODO:write FAT to disk
 	
-	this->dir[_file_id] = NULL;
+	this->dir[_file_id].start_block = 0;
+	this->dir[_file_id].size = 0;
 	//TODO:write dir to disk
 }
