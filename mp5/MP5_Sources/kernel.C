@@ -20,7 +20,7 @@
 
 /* -- COMMENT/UNCOMMENT THE FOLLOWING LINE TO EXCLUDE/INCLUDE SCHEDULER CODE */
 
-//#define _USES_SCHEDULER_
+#define _USES_SCHEDULER_
 /* This macro is defined when we want to force the code below to use 
    a scheduler.
    Otherwise, no scheduler is used, and the threads pass control to each 
@@ -64,7 +64,8 @@
 #endif
 
 #ifdef _USES_DISK_
-#include "simple_disk.H"
+//#include "simple_disk.H"
+#include "blocking_disk.H"
 #endif
 
 #ifdef _USES_FILESYSTEM_
@@ -99,7 +100,8 @@ Scheduler * SYSTEM_SCHEDULER;
 #ifdef _USES_DISK_
 
 /* -- A POINTER TO THE SYSTEM DISK */
-SimpleDisk * SYSTEM_DISK;
+//SimpleDisk * SYSTEM_DISK;
+BlockingDisk * SYSTEM_DISK;
 
 #define SYSTEM_DISK_SIZE 10485760
 
@@ -146,18 +148,19 @@ void pass_on_CPU(Thread * _to_thread) {
 
 #ifdef _USES_FILESYSTEM_
 
-int rand() {
+int rand(SimpleTimer *s_timer) {
   /* Rather silly random number generator. */
 
   unsigned long dummy_sec;
   int           dummy_tic;
 
-  //SimpleTimer::current(dummy_sec, dummy_tic);
+  s_timer->current(&dummy_sec, &dummy_tic);
 
   return dummy_tic;
 }
 
-void exercise_file_system(FileSystem * _file_system, SimpleDisk * _simple_disk) {
+//void exercise_file_system(FileSystem * _file_system, SimpleDisk * _simple_disk) {
+void exercise_file_system(FileSystem * _file_system, BlockingDisk * _simple_disk) {
   /* NOTHING FOR NOW 
      FEEL FREE TO ADD YOUR OWN CODE. */
 	FileSystem::Format(_simple_disk, _simple_disk->size());
@@ -170,22 +173,23 @@ void exercise_file_system(FileSystem * _file_system, SimpleDisk * _simple_disk) 
 	}
 	File f;
 	_file_system->LookupFile(0, &f);
-	char buf[1];
+	char buf[13] = "Hello World!";
 	unsigned int n = f.Read(1, buf);
 	if(n > 0)
 		Console::puts("Problem - able to read...\n");
-	buf[0] = 'a';
-	f.Write(1, buf);
+	//buf[0] = 'a';
+	f.Write(13, buf);
 	f.Reset();
-	char rbuf[1];
-	n = f.Read(1, rbuf);
-	if(n != 1)
+	char rbuf[12];
+	n = f.Read(12, rbuf);
+	if(n != 12)
 		Console::puts("Problem - not able to read...\n");
 	Console::puts("File Contents: ");
 	Console::puts(rbuf);
 	Console::puts("\n");
 	if(!_file_system->DeleteFile(0))
 		Console::puts("Not able to delete file\n");
+	//for(;;);
 }
 
 #endif
@@ -204,13 +208,13 @@ void fun1() {
 
     Console::puts("FUN 1 INVOKED!\n");
 
-    for(int j = 0;j < 1; j++) {
+    for(int j = 0;; j++) {
 
        Console::puts("FUN 1 IN ITERATION["); Console::puti(j); Console::puts("]\n");
 
-       //for (int i = 0; i < 10; i++) {
-       for (int i = 0; i < 0; i++) {
-	  Console::puts("FUN 1: TICK ["); Console::puti(i); Console::puts("]\n");
+       for (int i = 0; i < 10; i++) {
+       //for (int i = 0; i < 0; i++) {
+				 Console::puts("FUN 1: TICK ["); Console::puti(i); Console::puts("]\n");
        }
 
        pass_on_CPU(thread2);
@@ -230,7 +234,7 @@ void fun2() {
     int  write_block = 0;
 #endif
 
-    for(int j = 0;j < 1; j++) {
+    for(int j = 0;; j++) {
 
        Console::puts("FUN 2 IN ITERATION["); Console::puti(j); Console::puts("]\n");
 
@@ -243,7 +247,7 @@ void fun2() {
        /* -- Display */
        int i;
        for (i = 0; i < 512; i++) {
-	  Console::putch(buf[i]);
+				 Console::putch(buf[i]);
        }
 
 #ifndef _USES_FILESYSTEM_
@@ -261,8 +265,8 @@ void fun2() {
        read_block  = (read_block + 1) % 10;
 #else
 
-       //for (int i = 0; i < 10; i++) {
-       for (int i = 0; i < 0; i++) {
+       for (int i = 0; i < 10; i++) {
+       //for (int i = 0; i < 0; i++) {
 				 Console::puts("FUN 2: TICK ["); Console::puti(i); Console::puts("]\n");
        }
      
@@ -282,9 +286,9 @@ void fun3() {
 
     exercise_file_system(FILE_SYSTEM, SYSTEM_DISK);
 
-#else
     
-		for(int j = 0; j < 0; j++) {
+		for(int j = 0;; j++) {
+#else
 			
 			Console::puts("FUN 3 IN BURST["); Console::puti(j); Console::puts("]\n");
 
@@ -292,9 +296,9 @@ void fun3() {
 				 Console::puts("FUN 3: TICK ["); Console::puti(i); Console::puts("]\n");
        }
     
+#endif
        pass_on_CPU(thread4);
     }
-#endif
 }
 
 void fun4() {
@@ -305,7 +309,7 @@ void fun4() {
        Console::puts("FUN 4 IN BURST["); Console::puti(j); Console::puts("]\n");
 
        for (int i = 0; i < 10; i++) {
-	  Console::puts("FUN 4: TICK ["); Console::puti(i); Console::puts("]\n");
+				 Console::puts("FUN 4: TICK ["); Console::puti(i); Console::puts("]\n");
        }
 
        pass_on_CPU(thread1);
@@ -398,6 +402,7 @@ int main() {
   
     Scheduler system_scheduler = Scheduler();
     SYSTEM_SCHEDULER = &system_scheduler;
+		Thread::scheduler = SYSTEM_SCHEDULER;
 
 #endif
    
@@ -405,8 +410,10 @@ int main() {
 
     /* -- DISK DEVICE -- IF YOU HAVE ONE -- */
 
-    SimpleDisk system_disk = SimpleDisk(MASTER, SYSTEM_DISK_SIZE);
+    //SimpleDisk system_disk = SimpleDisk(MASTER, SYSTEM_DISK_SIZE);
+    BlockingDisk system_disk = BlockingDisk(MASTER, SYSTEM_DISK_SIZE, SYSTEM_SCHEDULER);
     SYSTEM_DISK = &system_disk;
+		SYSTEM_SCHEDULER->add_blocking_disk(SYSTEM_DISK);
 
 #endif
 

@@ -19,7 +19,6 @@
 /*--------------------------------------------------------------------------*/
 
 #define BLOCK_SIZE 512
-//#define MAX_NUM_OF_FILES 128
 #define MAX_NUM_OF_FILES (BLOCK_SIZE/sizeof(struct dir_node))
 //1 block for the directory map
 
@@ -28,8 +27,8 @@
 /*--------------------------------------------------------------------------*/
 
 #include "utils.H"
-//#include "blocking_disk.H"
-#include "simple_disk.H"
+#include "blocking_disk.H"
+//#include "simple_disk.H"
 
 /*--------------------------------------------------------------------------*/
 /* DATA STRUCTURES */ 
@@ -119,8 +118,8 @@ private:
 		 struct dir_node dir[MAX_NUM_OF_FILES];
 		 unsigned long alloc_start_block;
      
-     //BlockingDisk *disk;
-     SimpleDisk *disk;
+     BlockingDisk *disk;
+     //SimpleDisk *disk;
      unsigned int size;
 
 		 void write_dir_to_disk();
@@ -130,22 +129,22 @@ private:
 
 		 BOOLEAN get_free_block(unsigned long *block, unsigned long parent);
 
-		 //static void clear_ds_blocks(BlockingDisk *_disk, unsigned int _size);
-		 static void clear_ds_blocks(SimpleDisk *_disk, unsigned int _size);
+		 static void clear_ds_blocks(BlockingDisk *_disk, unsigned int _size);
+		 //static void clear_ds_blocks(SimpleDisk *_disk, unsigned int _size);
      
 public:
 
    FileSystem();   
    /* Just initializes local data structures. Does not connect to disk yet. */
 
-   //BOOLEAN Mount(BlockingDisk * _disk);
-   BOOLEAN Mount(SimpleDisk * _disk);
+   BOOLEAN Mount(BlockingDisk * _disk);
+   //BOOLEAN Mount(SimpleDisk * _disk);
    /* Associates the file system with a disk. We limit ourselves to at most one
       file system per disk. Returns TRUE if 'Mount' operation successful (i.e. there
       is indeed a file system on the disk. */
 
-   //static BOOLEAN Format(BlockingDisk * _disk, unsigned int _size);
-   static BOOLEAN Format(SimpleDisk * _disk, unsigned int _size);
+   static BOOLEAN Format(BlockingDisk * _disk, unsigned int _size);
+   //static BOOLEAN Format(SimpleDisk * _disk, unsigned int _size);
    /* Wipes any file system from the given disk and installs a new, empty, file
       system that supports up to _size Byte. */
 

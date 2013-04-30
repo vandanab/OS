@@ -128,7 +128,7 @@ unsigned int File::Write(unsigned int _n, char * _buf) {
 		Console::puts("\n");
 
 		memcpy(rbuf+offset_in_block, _buf+buf_index, bytes_to_write_in_current_block);
-		Console::putch(rbuf[0]);
+		//Console::putch(rbuf[0]);
 		Console::puts("\n");
 
 		this->file_system->disk->write(i, rbuf);
@@ -147,6 +147,7 @@ unsigned int File::Write(unsigned int _n, char * _buf) {
 		Console::puts("\n");
 
 		//TODO: write dir to disk
+		this->file_system->write_dir_to_disk();
 
 		//TODO: write FAT to disk if get_free_block doesnt write it
 	}
@@ -182,8 +183,11 @@ void File::Rewrite() {
 	this->file_size = 0;
 	this->file_system->dir[file_id].size = 0;
 	//TODO: write dir to disk
+	this->file_system->write_dir_to_disk();
+
 	this->file_system->FAT[this->start_block] = this->start_block;
 	//TODO: write FAT to disk
+	this->file_system->write_FAT_to_disk();
 }
 
 /* Is the current location for the file at the end of the file? */
@@ -212,8 +216,8 @@ FileSystem::FileSystem() {
 /* Associates the file system with a disk. We limit ourselves to at most one 
 	file system per disk. Returns TRUE if 'Mount' operation successful (i.e. there 
 	is indeed a file system on the disk. */
-//BOOLEAN FileSystem::Mount(BlockingDisk * _disk) {
-BOOLEAN FileSystem::Mount(SimpleDisk * _disk) {
+BOOLEAN FileSystem::Mount(BlockingDisk * _disk) {
+//BOOLEAN FileSystem::Mount(SimpleDisk * _disk) {
 	//initialize disk
 	this->disk = _disk;
 	this->size = _disk->size();
@@ -278,6 +282,7 @@ void FileSystem::read_FAT_from_disk() {
 }
 
 void FileSystem::write_dir_to_disk() {
+	Console::puts("In write_dir_to_disk\n");
 	const int DIR_NODE_SIZE = sizeof(struct dir_node);
 	unsigned char *buf = new unsigned char[BLOCK_SIZE];
 	for(int i = 0; i < MAX_NUM_OF_FILES; i++) {
@@ -285,6 +290,7 @@ void FileSystem::write_dir_to_disk() {
 		memcpy(buf+index, &this->dir[i], DIR_NODE_SIZE);
 	}
 	this->disk->write(0, buf);
+	Console::puts("Write of dir to disk complete\n");
 	delete buf;
 }
 
@@ -297,22 +303,23 @@ void FileSystem::write_FAT_to_disk() {
 		for(int j = 0; j < num_cells_per_block; j++) {
 			int fat_index = (i-1) * num_cells_per_block + j;
 			int index = j * LONG_SIZE;
-			memcpy(&this->FAT[fat_index], buf+index, sizeof(unsigned long));
+			memcpy(buf+index, &this->FAT[fat_index], LONG_SIZE);
 		}
 		this->disk->write(i, buf);
 	}
+	Console::puts("Write FAT to disk complete\n");
 	delete buf;
 }
 
 /* Wipes any file system from the given disk and installs a new, empty, file 
 	system that supports up to _size Byte. */
-//BOOLEAN FileSystem::Format(BlockingDisk * _disk, unsigned int _size) {
-BOOLEAN FileSystem::Format(SimpleDisk * _disk, unsigned int _size) {
+BOOLEAN FileSystem::Format(BlockingDisk * _disk, unsigned int _size) {
+//BOOLEAN FileSystem::Format(SimpleDisk * _disk, unsigned int _size) {
 	FileSystem::clear_ds_blocks(_disk, _size);
 }
 
-//void FileSystem::clear_ds_blocks(BlockingDisk *_disk, unsigned int _size) {
-void FileSystem::clear_ds_blocks(SimpleDisk *_disk, unsigned int _size) {
+void FileSystem::clear_ds_blocks(BlockingDisk *_disk, unsigned int _size) {
+//void FileSystem::clear_ds_blocks(SimpleDisk *_disk, unsigned int _size) {
 	int fat_size = (_size/BLOCK_SIZE);
 	int num_cells_per_block = BLOCK_SIZE/sizeof(unsigned long);
 	int num_of_blocks_taken_by_FAT = fat_size/num_cells_per_block;
@@ -352,6 +359,7 @@ BOOLEAN FileSystem::CreateFile(int _file_id) {
 		memcpy(&this->dir[_file_id], &x, sizeof(struct dir_node));
 		
 		//TODO:write dir to disk
+		this->write_dir_to_disk();
 		return TRUE;
 	}
 	return FALSE;
@@ -369,6 +377,7 @@ BOOLEAN FileSystem::get_free_block(unsigned long *block, unsigned long parent) {
 			}
 			*block = i;
 			//TODO:write FAT to disk
+			this->write_FAT_to_disk();
 			//or optimize and write to disk when the file write is complete
 			Console::puts("In get_free_block - free_block: ");
 			Console::putui((unsigned int)i);
@@ -392,8 +401,10 @@ BOOLEAN FileSystem::DeleteFile(int _file_id) {
 	} while(i != this->dir[_file_id].start_block);
 
 	//TODO:write FAT to disk
+	this->write_FAT_to_disk();
 	
 	this->dir[_file_id].start_block = 0;
 	this->dir[_file_id].size = 0;
 	//TODO:write dir to disk
+	this->write_dir_to_disk();
 }
